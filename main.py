@@ -7,33 +7,20 @@ import numpy as np
 
 app = FastAPI()
 
-# Load your provided model file
-model = tf.keras.models.load_model("test_model(1).h5")
+# Load your model
+model = tf.keras.models.load_model("test_model.h5")
+
+# Define your class labels (use the exact labels from your training data)
+class_labels = ["bird", "animal"]  # Update with the correct list of labels
 
 def preprocess_image(image: Image.Image):
     """
     Preprocess the image to fit the model's input requirements.
-    This includes resizing and normalizing the image.
     """
-    image = image.resize((224, 224))  # Resize to the input size expected by the model
-    image = np.array(image) / 255.0   # Normalize the image if required by the model
-    image = np.expand_dims(image, axis=0)  # Expand dimensions to fit the model's input shape
+    image = image.resize((224, 224))  # Adjust size if different for your model
+    image = np.array(image) / 255.0
+    image = np.expand_dims(image, axis=0)
     return image
-
-def predict_animal(image: Image.Image):
-    """
-    Predict whether the image is of an animal or a bird.
-    """
-    processed_image = preprocess_image(image)
-    predictions = model.predict(processed_image)
-    # Interpret the predictions - assuming a binary classification
-    result = "Animal" if predictions[0][0] > 0.5 else "Bird"
-    return result
-
-@app.get("/")
-def hello():
-    return "hello"
-
 
 @app.post("/predict/")
 async def predict(file: UploadFile = File(...)):
@@ -42,10 +29,15 @@ async def predict(file: UploadFile = File(...)):
     """
     contents = await file.read()
     image = Image.open(io.BytesIO(contents))
-    result = predict_animal(image)
-    return JSONResponse(content={"prediction": result})
+    processed_image = preprocess_image(image)
+    predictions = model.predict(processed_image)
+    
+    # Assume a multi-class prediction; take the index of the highest confidence
+    predicted_index = np.argmax(predictions[0])
+    predicted_label = class_labels[predicted_index]
+
+    return JSONResponse(content={"prediction": predicted_label})
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
